@@ -1,0 +1,22 @@
+{
+  "name": "iidx-hub",
+  "version": "1.0.0",
+  "description": "",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "main": "index.js",
+  "scripts": {
+    "dev:db-frontend": "pnpm --filter song-database-frontend dev",
+    "dev:db-backend": "pnpm --filter song-database-backend dev",
+    "build:all": "pnpm -r build",
+    "scrape": "pnpm --filter scraper start"
+  },
+    "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "keywords": [],
+  "author": "Natsugure",
+  "packageManager": "pnpm@10.7.1"
+}
