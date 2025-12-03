@@ -1,3 +1,5 @@
 packages:
-  - 'packages/*'
-  - 'apps/*'
+  - 'packages/database/*'
+  - 'packages/scraper/*'
+  - 'apps/backend/*'
+  - 'apps/frontend/*'
