@@ -1,5 +1,5 @@
 /**
- * textage.cc の titletbl.js をパースして楽曲情報を抽出するスクリプト（修正版）
+ * textage.cc の titletbl.js をパースして楽曲情報を抽出するスクリプト
  * 
  * データ形式:
  * titletbl={

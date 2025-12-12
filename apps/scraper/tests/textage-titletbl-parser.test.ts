@@ -6,7 +6,7 @@
  * pnpm test:parser
  */
 
-import { fetchAndParseTitletbl } from './textage-parser';
+import { fetchAndParseTitletbl } from '../src/textage-titletbl-parser';
 
 async function main() {
   console.log('='.repeat(60));
