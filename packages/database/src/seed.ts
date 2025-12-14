@@ -1,78 +1,64 @@
-import { PrismaClient } from '@prisma/client';
+// packages/database/src/seed.ts
+import prisma from './client';
 
-const prisma = new PrismaClient();
+// バージョンマスタデータ
+const VERSIONS = [
+  { id: '1', name: '1st style' },
+  { id: 'ss', name: 'substream' },
+  { id: '2', name: '2nd style' },
+  { id: '3', name: '3rd style' },
+  { id: '4', name: '4th style' },
+  { id: '5', name: '5th style' },
+  { id: '6', name: '6th style' },
+  { id: '7', name: '7th style' },
+  { id: '8', name: '8th style' },
+  { id: '9', name: '9th style' },
+  { id: '10', name: '10th style' },
+  { id: '11', name: 'IIDX RED' },
+  { id: '12', name: 'HAPPY SKY' },
+  { id: '13', name: 'DistorteD' },
+  { id: '14', name: 'GOLD' },
+  { id: '15', name: 'DJ TROOPERS' },
+  { id: '16', name: 'EMPRESS' },
+  { id: '17', name: 'SIRIUS' },
+  { id: '18', name: 'Resort Anthem' },
+  { id: '19', name: 'Lincle' },
+  { id: '20', name: 'tricoro' },
+  { id: '21', name: 'SPADA' },
+  { id: '22', name: 'PENDUAL' },
+  { id: '23', name: 'copula' },
+  { id: '24', name: 'SINOBUZ' },
+  { id: '25', name: 'CANNON BALLERS' },
+  { id: '26', name: 'Rootage' },
+  { id: '27', name: 'HEROIC VERSE' },
+  { id: '28', name: 'BISTROVER' },
+  { id: '29', name: 'CastHour' },
+  { id: '30', name: 'RESIDENT' },
+  { id: '31', name: 'EPOLIS' },
+  { id: '32', name: 'Pinky Crush' },
+  { id: '33', name: 'Sparkle Shower'}
+];
 
 async function main() {
-  console.log('🌱 Starting database seeding...');
+  console.log('🌱 Starting seed...');
 
-  // サンプル楽曲データ
-  const songs = [
-    {
-      title: 'MENDES',
-      titleKana: 'めんです',
-      genre: 'SAMBA',
-      artist: 'Hugo Lobo',
-      bpm: '140',
-      version: '7th style',
-      charts: [
-        { playStyle: 'SP', difficulty: 'NORMAL', level: 5, notes: 456 },
-        { playStyle: 'SP', difficulty: 'HYPER', level: 8, notes: 789 },
-        { playStyle: 'SP', difficulty: 'ANOTHER', level: 11, notes: 1234, unofficialLevel: '11.5' },
-      ],
-    },
-    {
-      title: 'FLOWER',
-      titleKana: 'ふらわー',
-      genre: 'HAPPY HARDCORE',
-      artist: 'DJ YOSHITAKA',
-      bpm: '173',
-      version: 'Resort Anthem',
-      charts: [
-        { playStyle: 'SP', difficulty: 'NORMAL', level: 6, notes: 612 },
-        { playStyle: 'SP', difficulty: 'HYPER', level: 10, notes: 1133 },
-        { playStyle: 'SP', difficulty: 'ANOTHER', level: 12, notes: 2020, unofficialLevel: '12.3' },
-      ],
-    },
-    {
-      title: '卑弥呼',
-      titleKana: 'ひみこ',
-      genre: 'WORLD/ELECTRONICA',
-      artist: '朱雀 VS 玄武',
-      bpm: '90-180',
-      version: '14 GOLD',
-      charts: [
-        { playStyle: 'SP', difficulty: 'NORMAL', level: 7, notes: 688 },
-        { playStyle: 'SP', difficulty: 'HYPER', level: 11, notes: 1248 },
-        { playStyle: 'SP', difficulty: 'ANOTHER', level: 12, notes: 1899, unofficialLevel: '12.5' },
-      ],
-    },
-  ];
-
-  // データベースに投入
-  for (const songData of songs) {
-    const { charts, ...songInfo } = songData;
-    
-    const song = await prisma.song.create({
-      data: {
-        ...songInfo,
-        charts: {
-          create: charts,
-        },
-      },
-      include: {
-        charts: true,
-      },
+  // バージョンマスタを投入
+  console.log('Seeding versions...');
+  for (const version of VERSIONS) {
+    await prisma.version.upsert({
+      where: { id: version.id },
+      update: { name: version.name },
+      create: version,
     });
-    
-    console.log(`✅ Created song: ${song.title} with ${song.charts.length} charts`);
   }
+  console.log(`✓ Seeded ${VERSIONS.length} versions`);
 
-  console.log('✨ Database seeding completed!');
+  console.log('✅ Seed completed successfully');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error during seeding:', e);
+    console.error('❌ Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {
