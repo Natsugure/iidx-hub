@@ -1,5 +1,7 @@
 packages:
-  - 'packages/database/*'
-  - 'packages/scraper/*'
-  - 'apps/backend/*'
-  - 'apps/frontend/*'
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - prisma

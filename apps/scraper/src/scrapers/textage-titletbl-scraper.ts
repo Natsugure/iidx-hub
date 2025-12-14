@@ -8,7 +8,8 @@
  */
 
 import axios from 'axios';
-import * as fs from 'fs';
+import iconv from 'iconv-lite';
+import he from 'he';
 
 // インデックス定数（titletbl.jsから）
 const VERINDEX = 0;     // バージョン番号
@@ -19,9 +20,9 @@ const ARTISTINDEX = 4;   // アーティスト名
 const TITLEINDEX = 5;    // 楽曲タイトル
 const SUBTITLEINDEX = 6; // サブタイトル
 
-interface TextageSong {
+type TextageSong = {
   songId: string;           // JavaScriptオブジェクトのキー
-  version: number;          // 収録バージョン
+  version: string;          // 収録バージョン
   textageId: number;        // textage内部ID
   option: number;           // オプションフラグ
   genre: string;            // ジャンル
@@ -29,8 +30,7 @@ interface TextageSong {
   title: string;            // タイトル
   subtitle?: string;        // サブタイトル
   rawTitle: string;         // HTML装飾込みの生タイトル
-}
-
+};
 
 function parseTitleTbl(jsContent: string): TextageSong[] {
   const songs: TextageSong[] = [];
@@ -43,8 +43,9 @@ function parseTitleTbl(jsContent: string): TextageSong[] {
 
   const titletblContent = match[1];
 
-  // 各楽曲エントリを正規表現でパース（改行とタブに対応）
-  const entryRegex = /'([^']+)'\s*:\s*\[([^\]]+)\]/g;
+  // 各楽曲エントリを正規表現でパース
+  // 文字列内の]や、ネストした構造に対応
+  const entryRegex = /'([^']+)'\s*:\s*\[((?:[^"'\[\]]|"[^"]*"|'[^']*'|\[[^\]]*\])*)\]/g;
   
   let entryMatch;
   let matchCount = 0;
@@ -53,6 +54,12 @@ function parseTitleTbl(jsContent: string): TextageSong[] {
     matchCount++;
     const songId = entryMatch[1];
     const dataStr = entryMatch[2];
+
+    // MAX 360のデバッグ
+    if (songId.includes('max') && songId.includes('360')) {
+      console.log(`Found MAX 360: songId="${songId}"`);
+      console.log(`Raw dataStr: ${dataStr}`);
+    }
 
     if (songId === '__dmy__' || songId.startsWith('//')) {
       continue;
@@ -65,6 +72,11 @@ function parseTitleTbl(jsContent: string): TextageSong[] {
     try {
       const values = parseDataArray(dataStr);
 
+      // MAX 360のデバッグ
+      if (songId.includes('max') && songId.includes('360')) {
+        console.log(`Parsed values (${values.length}):`, values);
+      }
+
       // 値が不足している場合はスキップ
       if (values.length < 6) {
         console.warn(`Skipping ${songId}: insufficient data (${values.length} values)`);
@@ -76,7 +88,7 @@ function parseTitleTbl(jsContent: string): TextageSong[] {
 
       const song: TextageSong = {
         songId,
-        version: parseInt(values[VERINDEX]) || 0,
+        version: cleanString(values[VERINDEX]).toLowerCase(),
         textageId: parseInt(values[IDINDEX]) || 0,
         option: parseInt(values[OPTINDEX]) || 0,
         genre: cleanString(values[GENREINDEX]),
@@ -86,7 +98,7 @@ function parseTitleTbl(jsContent: string): TextageSong[] {
       };
 
       if (values[SUBTITLEINDEX]) {
-        song.subtitle = cleanString(values[SUBTITLEINDEX]);
+        song.subtitle = cleanHtmlString(values[SUBTITLEINDEX]);
       }
 
       songs.push(song);
@@ -105,15 +117,20 @@ function parseDataArray(dataStr: string): string[] {
   let current = '';
   let inString = false;
   let stringChar = '';
-  let depth = 0; // 括弧のネスト深度
+  let parenDepth = 0;    // 丸括弧のネスト深度
+  let bracketDepth = 0;  // 角括弧のネスト深度
 
   for (let i = 0; i < dataStr.length; i++) {
     const char = dataStr[i];
     const prevChar = i > 0 ? dataStr[i - 1] : '';
 
-    // 括弧の深度を追跡
-    if (char === '(' && !inString) depth++;
-    if (char === ')' && !inString) depth--;
+    // 括弧の深度を追跡（文字列外のみ）
+    if (!inString) {
+      if (char === '(') parenDepth++;
+      if (char === ')') parenDepth--;
+      if (char === '[') bracketDepth++;
+      if (char === ']') bracketDepth--;
+    }
 
     // 文字列の開始/終了を検出
     if ((char === '"' || char === "'") && prevChar !== '\\') {
@@ -129,7 +146,7 @@ function parseDataArray(dataStr: string): string[] {
     }
 
     // カンマで分割（文字列内や括弧内でない場合のみ）
-    if (char === ',' && !inString && depth === 0) {
+    if (char === ',' && !inString && parenDepth === 0 && bracketDepth === 0) {
       values.push(current.trim());
       current = '';
     } else {
@@ -150,11 +167,45 @@ function parseDataArray(dataStr: string): string[] {
  */
 function cleanString(str: string): string {
   if (!str) return '';
-  return str
+  
+  let cleaned = str
     .trim()
-    .replace(/^["']|["']$/g, '') // 前後の引用符を除去
-    .replace(/\\"/g, '"')        // エスケープされた引用符を戻す
-    .replace(/\\'/g, "'");
+    .replace(/^["']|["']$/g, ''); // 前後の引用符を除去
+  
+  // JavaScriptのエスケープシーケンスをデコード
+  cleaned = decodeEscapeSequences(cleaned);
+  
+  // HTML文字参照をデコード（数値・名前付き両方に対応）
+  cleaned = he.decode(cleaned);
+  
+  // HTMLタグを除去
+  cleaned = cleaned.replace(/<[^>]+>/g, '');
+  
+  // エスケープされたスラッシュを通常のスラッシュに
+  cleaned = cleaned.replace(/\\\//g, '/');
+  
+  return cleaned;
+}
+
+/**
+ * JavaScriptのエスケープシーケンスをデコード
+ */
+function decodeEscapeSequences(str: string): string {
+  // \uXXXX形式のUnicodeエスケープをデコード
+  let decoded = str.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+  
+  // 他の基本的なエスケープシーケンス
+  decoded = decoded
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\\\/g, '\\')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t');
+  
+  return decoded;
 }
 
 /**
@@ -163,13 +214,14 @@ function cleanString(str: string): string {
 function cleanHtmlString(str: string): string {
   if (!str) return '';
   
+  // .fontcolor()を除去
   let cleaned = str.replace(/\.fontcolor\([^)]+\)/g, '');
   
+  // .link()を除去
   cleaned = cleaned.replace(/\.link\([^)]+\)/g, '');
   
   return cleanString(cleaned);
 }
-
 
 async function fetchAndParseTitletbl(): Promise<TextageSong[]> {
   const url = 'https://textage.cc/score/titletbl.js';
@@ -177,22 +229,24 @@ async function fetchAndParseTitletbl(): Promise<TextageSong[]> {
   console.log(`Fetching ${url}...`);
   
   try {
+    // Shift-JISでエンコードされているため、バイナリで取得してデコード
     const response = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept-Charset': 'utf-8',
       },
-      responseType: 'text',
-      responseEncoding: 'utf8',
+      responseType: 'arraybuffer', // バイナリで取得
       timeout: 15000,
     });
 
-    console.log(`✓ Fetched successfully (${response.data.length} bytes)`);
+    // Shift-JISからUTF-8にデコード
+    const decodedContent = iconv.decode(Buffer.from(response.data), 'Shift_JIS');
+    
+    console.log(`✓ Fetched successfully (${decodedContent.length} characters)`);
     
     // デバッグ: ファイルの最初の部分を表示
-    console.log(`First 200 chars: ${response.data.substring(0, 200)}`);
+    console.log(`First 200 chars: ${decodedContent.substring(0, 200)}`);
     
-    const songs = parseTitleTbl(response.data);
+    const songs = parseTitleTbl(decodedContent);
     console.log(`✓ Parsed ${songs.length} songs`);
     
     return songs;
@@ -204,8 +258,6 @@ async function fetchAndParseTitletbl(): Promise<TextageSong[]> {
   }
 }
 
-
-// エクスポート
 export {
   TextageSong,
   parseTitleTbl,

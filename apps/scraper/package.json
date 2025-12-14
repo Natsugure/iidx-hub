@@ -5,19 +5,23 @@
   "scripts": {
     "scrape": "tsx src/json-scraper.ts",
     "inspect": "tsx src/inspect-json.ts",
-    "test:parser": "tsx src/test-textage-parser.ts",
     "dev": "tsx watch src/json-scraper.ts",
     "build": "tsc"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "axios": "^1.6.0",
-    "cheerio": "^1.0.0-rc.12",
-    "dotenv": "17.2.3"
+    "@iidx-hub/database": "workspace:*",
+    "@iidx-hub/shared": "workspace:*",
+    "@prisma/client": "^7.1.0",
+    "axios": "^1.13.2",
+    "cheerio": "^1.1.2",
+    "dotenv": "17.2.3",
+    "he": "^1.2.0",
+    "iconv-lite": "^0.7.1"
   },
   "devDependencies": {
-    "@types/node": "^20.19.25",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.0"
+    "@types/he": "^1.2.3",
+    "@types/node": "^20.19.26",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

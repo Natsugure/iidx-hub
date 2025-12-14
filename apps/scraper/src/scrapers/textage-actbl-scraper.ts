@@ -1,32 +1,27 @@
-// src/scrapers/textage-actbl-scraper.ts
 import axios from 'axios';
+import iconv from 'iconv-lite';
 
-// 譜面情報の型定義
-export interface ChartData {
+export type ChartData = {
   level: number | null;  // 1-12, または null (譜面なし)
   hasChartData: boolean;
   is12ScaleNotation: boolean;
   isInAC: boolean;
   hasCNorBSS: boolean;
-}
+};
 
-// 楽曲の譜面情報
-export interface SongData {
+export type SongData = {
   tag: string;
-  // 収録状態フラグ
   isInAC: boolean;
   isInINFINITAS: boolean;
   hasBeginner: boolean;
   hasLeggendaria: boolean;
   
-  // SP譜面
   spBeginner: ChartData;
   spNormal: ChartData;
   spHyper: ChartData;
   spAnother: ChartData;
   spLeggendaria: ChartData;
   
-  // DP譜面
   dpBeginner: ChartData;
   dpNormal: ChartData;
   dpHyper: ChartData;
@@ -34,7 +29,7 @@ export interface SongData {
   dpLeggendaria: ChartData;
   
   additionalInfo?: number;
-}
+};
 
 // レベル値を数値に変換 (A=10, B=11, C=12...)
 function parseLevel(levelStr: string | number): number | null {
@@ -62,7 +57,6 @@ function parseOptions(opt: number): {
   };
 }
 
-// 譜面データを作成
 function createChartData(level: string | number, opt: number): ChartData {
   const options = parseOptions(opt);
   return {
@@ -71,7 +65,6 @@ function createChartData(level: string | number, opt: number): ChartData {
   };
 }
 
-// 収録状態フラグをパース
 function parseInclusionFlags(flag: number) {
   return {
     isInAC: (flag & 1) !== 0,
@@ -90,17 +83,21 @@ export async function fetchTextageActblData(filterAC: boolean = true): Promise<S
   try {
     console.log('Fetching actbl.js from textage.cc...');
     
+    // Shift-JISでエンコードされているため、バイナリで取得してデコード
     const response = await axios.get('https://textage.cc/score/actbl.js', {
-      responseType: 'text',
+      responseType: 'arraybuffer',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
     });
 
+    // Shift-JISからUTF-8にデコード
+    const decodedContent = iconv.decode(Buffer.from(response.data), 'Shift_JIS');
+
     console.log('Parsing JavaScript content...');
     
     // actbl オブジェクトを抽出
-    const actblMatch = response.data.match(/actbl\s*=\s*\{([\s\S]*?)\n\};/);
+    const actblMatch = decodedContent.match(/actbl\s*=\s*\{([\s\S]*?)\n\};/);
     
     if (!actblMatch) {
       throw new Error('actbl object not found in the response');
@@ -172,15 +169,12 @@ export async function fetchTextageActblData(filterAC: boolean = true): Promise<S
         spAnother: createChartData(dataArray[9], dataArray[10] as number),
         spLeggendaria: createChartData(dataArray[11], dataArray[12] as number),
         
-        // DP譜面 (インデックス 15-22)
-        dpBeginner: createChartData(dataArray[15], dataArray[16] as number),
-        dpNormal: createChartData(dataArray[17], dataArray[18] as number),
-        dpHyper: createChartData(dataArray[19], dataArray[20] as number),
-        dpAnother: createChartData(dataArray[21], dataArray[22] as number),
-        dpLeggendaria: createChartData(
-          dataArray[23] || 0, 
-          (dataArray[24] as number) || 0
-        ),
+        // DP譜面 (インデックス 13-22)
+        dpBeginner: createChartData(dataArray[13], dataArray[14] as number),
+        dpNormal: createChartData(dataArray[15], dataArray[16] as number),
+        dpHyper: createChartData(dataArray[17], dataArray[18] as number),
+        dpAnother: createChartData(dataArray[19], dataArray[20] as number),
+        dpLeggendaria: createChartData(dataArray[21], dataArray[22] as number),
       };
 
       // 追加情報があれば含める
